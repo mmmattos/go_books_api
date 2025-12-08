@@ -1,4 +1,4 @@
-module github.com/user/bookapi
+module github.com/mmmattos/books_api
 
 go 1.23.0
 

@@ -1,12 +1,12 @@
-package http
+package handlers
 
 import (
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/user/bookapi/internal/app"
-	"github.com/user/bookapi/internal/domain"
+	"github.com/mmmattos/books_api/internal/app"
+	"github.com/mmmattos/books_api/internal/domain"
 )
 
 // BookHandler provides HTTP handlers.

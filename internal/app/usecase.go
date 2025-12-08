@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 
-	"github.com/user/bookapi/internal/domain"
+	"github.com/mmmattos/books_api/internal/domain"
 )
 
 // Usecase coordinates domain operations.

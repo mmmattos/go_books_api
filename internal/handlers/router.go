@@ -1,10 +1,10 @@
-package http
+package handlers
 
 import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/user/bookapi/internal/app"
+	"github.com/mmmattos/books_api/internal/app"
 )
 
 // Router wires handlers.
