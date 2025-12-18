@@ -22,10 +22,10 @@ func NewRouter(u *app.Usecase) *Router {
 func (r *Router) registerRoutes() {
 	bh := NewBookHandler(r.usecase)
 
-	r.mux.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
+	// r.mux.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
+	// 	w.WriteHeader(http.StatusOK)
+	// 	w.Write([]byte("OK"))
+	// })
 
 	r.mux.HandleFunc("/books", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {

@@ -9,29 +9,42 @@
 #   make fmt vet test # code hygiene & tests
 #   make docker-build # build docker image
 #   make docker-run   # run docker image locally
-#   make deploy       # build & deploy to Cloud Run (uses gcloud)
+#   make deploy       # build & deploy to Cloud Run (immutable image)
 # Environment: override any variable on CLI, e.g. `make run PORT=9090`
 
 APP_NAME ?= books-api
 PORT ?= 8080
 
-# Local Postgres container defaults (change as needed)
+# ------------------------------
+# Local Postgres container
+# ------------------------------
 DB_USER ?= user
 DB_PASS ?= password
 DB_NAME ?= booksdb
 DB_CONTAINER ?= books-db
 
-# Docker / GCR / Cloud Run
-PROJECT ?= $(shell gcloud config get-value project 2>/dev/null || echo my-project)
-REGION ?= us-central1
-IMAGE ?= gcr.io/$(PROJECT)/$(APP_NAME)
+# ------------------------------
+# GCP / Cloud Run
+# ------------------------------
+PROJECT ?= gcp-books-api
+REGION  ?= us-east1
+REPO    ?= book-repo
+
+# Immutable image (git SHA)
+TAG        := $(shell git rev-parse --short HEAD)
+IMAGE_BASE := $(REGION)-docker.pkg.dev/$(PROJECT)/$(REPO)/$(APP_NAME)
+IMAGE      := $(IMAGE_BASE):$(TAG)
+
 # Cloud SQL instance connection name (project:region:instance)
-INSTANCE_CONN ?= my-project:us-central1:booksdb
+INSTANCE_CONN ?= my-project:us-east1:booksdb
 
 # Helpers
 GOFILES := $(shell find . -name '*.go' -not -path "./vendor/*")
 
-.PHONY: help build run run-dev fmt vet test db seed clean-db docker-build docker-run docker-push deploy cloud-build logs clean
+.PHONY: help build run run-dev fmt vet test \
+        db seed clean-db \
+        docker-build docker-run docker-push cloud-build \
+        deploy deploy-only logs clean info
 
 help:
 	@echo "Makefile targets:"
@@ -45,12 +58,13 @@ help:
 	@echo "  seed          Load schema.sql into local Postgres container"
 	@echo "  clean-db      Stop & remove local Postgres container"
 	@echo "  docker-build  Build Docker image"
-	@echo "  docker-run    Run Docker image locally (exposes $(PORT))"
-	@echo "  docker-push   Push Docker image to container registry"
-	@echo "  cloud-build   Use Cloud Build to build & push image"
-	@echo "  deploy        Deploy to Cloud Run (attach Cloud SQL if INSTANCE_CONN provided)"
+	@echo "  docker-run    Run Docker image locally"
+	@echo "  cloud-build   Build & push image using Cloud Build (immutable)"
+	@echo "  deploy        Build + deploy to Cloud Run (immutable)"
+	@echo "  deploy-only   Deploy previously built image"
+	@echo "  info          Show active Cloud Run revision & image"
 	@echo "  logs          Read Cloud Run logs"
-	@echo "  clean         remove build artifacts"
+	@echo "  clean         Remove local build artifacts"
 
 # ------------------------------
 # Build / Run
@@ -60,18 +74,16 @@ build:
 	@go mod tidy
 	@go build -o $(APP_NAME) ./cmd/api-service
 
-# Run the compiled binary (prod-like)
 run: build
 	@echo "=> Running $(APP_NAME) on :$(PORT)"
 	@PORT=$(PORT) ./$(APP_NAME)
 
-# Fast dev runner using `go run` (no binary produced)
 run-dev:
 	@echo "=> go run ./cmd/api-service (PORT=$(PORT))"
 	@PORT=$(PORT) go run ./cmd/api-service
 
 # ------------------------------
-# Formatting / Analysis / Tests
+# Formatting / Tests
 # ------------------------------
 fmt:
 	@gofmt -w .
@@ -85,11 +97,15 @@ test:
 	@go test ./...
 
 # ------------------------------
-# Local Postgres (docker)
+# Local Postgres (Docker)
 # ------------------------------
 db:
-	@echo "=> Starting local Postgres container '$(DB_CONTAINER)' (user=$(DB_USER) db=$(DB_NAME))"
-	@docker run --name $(DB_CONTAINER) -e POSTGRES_USER=$(DB_USER) -e POSTGRES_PASSWORD=$(DB_PASS) -e POSTGRES_DB=$(DB_NAME) -p 5432:5432 -d postgres:16-alpine || true
+	@echo "=> Starting local Postgres container '$(DB_CONTAINER)'"
+	@docker run --name $(DB_CONTAINER) \
+		-e POSTGRES_USER=$(DB_USER) \
+		-e POSTGRES_PASSWORD=$(DB_PASS) \
+		-e POSTGRES_DB=$(DB_NAME) \
+		-p 5432:5432 -d postgres:16-alpine || true
 	@sleep 2
 	@$(MAKE) seed
 
@@ -102,7 +118,7 @@ clean-db:
 	@docker rm -f $(DB_CONTAINER) || true
 
 # ------------------------------
-# Docker image targets
+# Docker (local only)
 # ------------------------------
 docker-build:
 	@echo "=> docker build -t $(IMAGE) ."
@@ -116,32 +132,47 @@ docker-push:
 	@echo "=> docker push $(IMAGE)"
 	docker push $(IMAGE)
 
-# Use Cloud Build to build + push to GCR
+# ------------------------------
+# Cloud Build (immutable)
+# ------------------------------
 cloud-build:
-	@echo "=> gcloud builds submit --tag $(IMAGE)"
-	gcloud builds submit --tag $(IMAGE)
+	@echo "=> Building image $(IMAGE) with Cloud Build"
+	gcloud builds submit \
+		--project $(PROJECT) \
+		--tag $(IMAGE)
 
 # ------------------------------
-# Cloud Run deployment
+# Cloud Run deployment (IMMUTABLE)
 # ------------------------------
-# NOTE: when using Cloud SQL with Cloud Run, we set DB_CONN to use the Cloud SQL unix socket.
-# Example DB_CONN: postgres://user:password@/booksdb?host=/cloudsql/PROJECT:REGION:INSTANCE
-deploy:
-	@echo "=> Deploying to Cloud Run: service=$(APP_NAME) region=$(REGION)"
-	@if [ -z "$(PROJECT)" ]; then echo "ERROR: PROJECT not set"; exit 1; fi
+deploy: cloud-build deploy-only
+
+deploy-only:
+	@echo "=> Deploying $(IMAGE) to Cloud Run"
 	@if [ -n "$(INSTANCE_CONN)" ]; then \
 		CONN="postgres://$(DB_USER):$(DB_PASS)@/$(DB_NAME)?host=/cloudsql/$(INSTANCE_CONN)"; \
-		echo "Deploying with Cloud SQL instance $(INSTANCE_CONN) and DB_CONN=$(CONN)"; \
-		gcloud run deploy $(APP_NAME) --image $(IMAGE) --region=$(REGION) --platform managed --allow-unauthenticated --set-env-vars PORT=$(PORT),DB_CONN="$(CONN)" --add-cloudsql-instances $(INSTANCE_CONN); \
+		gcloud run deploy $(APP_NAME) \
+			--image $(IMAGE) \
+			--region $(REGION) \
+			--allow-unauthenticated \
+			--set-env-vars DB_CONN="$$CONN" \
+			--add-cloudsql-instances $(INSTANCE_CONN); \
 	else \
-		gcloud run deploy $(APP_NAME) --image $(IMAGE) --region=$(REGION) --platform managed --allow-unauthenticated --set-env-vars PORT=$(PORT); \
+		gcloud run deploy $(APP_NAME) \
+			--image $(IMAGE) \
+			--region $(REGION) \
+			--allow-unauthenticated; \
 	fi
+
+info:
+	@gcloud run services describe $(APP_NAME) \
+		--region $(REGION) \
+		--format="value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)"
 
 logs:
 	@gcloud run logs read $(APP_NAME) --region=$(REGION) --limit=100
 
 # ------------------------------
-# Cleanup / misc
+# Cleanup
 # ------------------------------
 clean:
 	@echo "=> cleaning $(APP_NAME)"

@@ -15,9 +15,9 @@ Implements a layered, production-style Go architecture:
 
 ---
 
-## 🚀 Features
+## Features
 
-### ✔ REST API Endpoints
+### REST API Endpoints
 
 | Method | Path          | Description |
 |--------|---------------|-------------|
@@ -28,28 +28,28 @@ Implements a layered, production-style Go architecture:
 | PUT    | `/books/{id}` | Update a book |
 | DELETE | `/books/{id}` | Delete a book |
 
-### ✔ In-memory repository (default)
+### In-memory repository (default)
 
 Perfect for local development and testing.
 
-### ✔ PostgreSQL repository (stub included)
+### PostgreSQL repository (stub included)
 
 Ready to extend with SQL queries.
 
-### ✔ Docker support
+### Docker support
 
 Multi-stage build → extremely small distroless runtime image.
 
-### ✔ Cloud Run–ready
+### Cloud Run–ready
 
 Deployment script, Cloud SQL socket connection, configurable runtime variables.
 
 ---
 
-## 🧱 Project Structure
+## Project Structure
 
 ```
-bookapi/
+books_api/
 ├── cmd/api-service/main.go
 ├── internal/
 │   ├── domain/
@@ -68,7 +68,7 @@ bookapi/
 
 ---
 
-## 🛠 Requirements
+## Requirements
 
 - Go **1.20+**
 - Docker (optional but recommended)
@@ -77,7 +77,7 @@ bookapi/
 
 ---
 
-## ▶️ Running Locally (Default: In-memory Repository)
+## Running Locally (Default: In-memory Repository)
 
 ### Fastest option:
 
@@ -157,7 +157,7 @@ make run-dev
 
 ---
 
-## 🔄 Examples of Overriding Variables
+## Examples of Overriding Variables
 
 Run on a different port:
 
@@ -185,7 +185,7 @@ make db DB_USER=app DB_PASS=secret DB_NAME=bookstore
 
 ---
 
-## 🗄️ Running PostgreSQL Locally (Docker)
+## Running PostgreSQL Locally (Docker)
 
 Start DB + seed schema:
 
@@ -230,7 +230,7 @@ DB_CONN="postgres://user:password@localhost:5432/booksdb?sslmode=disable" make r
 
 ---
 
-## 🐳 Docker
+## Docker
 
 Build:
 
@@ -252,7 +252,7 @@ make docker-push
 
 ---
 
-## ☁️ Deploy to Google Cloud Run
+## Deploy to Google Cloud Run
 
 Build via Cloud Build:
 
@@ -290,34 +290,21 @@ make vet
 
 ---
 
-## 🧼 Formatting
+## Formatting
 
 ```bash
 make fmt
 ```
 
----
-
-## 🔧 Extending the Project
-
-You can add:
-
-- Authentication (JWT, OAuth)
-- Middleware for logging, metrics, tracing
-- Full SQL repository
-- Swagger / OpenAPI docs
-- gRPC API
-- CI/CD pipeline
-- Terraform IaC
 
 ---
 
-## 📄 License
+## License
 
 MIT (or your preferred license)
 
 ---
 
-## 🙌 Contributing
+## Contributing
 
 PRs welcome.
