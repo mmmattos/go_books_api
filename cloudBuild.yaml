@@ -1,0 +1,19 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_IMAGE}
+      - --build-arg
+      - VERSION=${_VERSION}
+      - --build-arg
+      - COMMIT_SHA=${_COMMIT_SHA}
+      - .
+
+images:
+  - ${_IMAGE}
+
+substitutions:
+  _IMAGE: "us-east1-docker.pkg.dev/gcp-books-api/book-repo/books-api:latest"
+  _VERSION: "dev"
+  _COMMIT_SHA: "unknown"
