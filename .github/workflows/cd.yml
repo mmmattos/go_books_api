@@ -29,18 +29,19 @@ jobs:
         with:
           project_id: gcp-books-api
 
-      - name: Build image with Cloud Build
+      - name: Build image with Cloud Build (async)
         run: |
           set -e
 
           TAG=$(git rev-parse --short HEAD)
           IMAGE=us-east1-docker.pkg.dev/gcp-books-api/book-repo/books-api:$TAG
 
-          echo "Building image: $IMAGE"
+          echo "Starting Cloud Build for image: $IMAGE"
 
           gcloud builds submit \
             --config cloudbuild.yaml \
             --substitutions=_IMAGE=$IMAGE,_VERSION=$TAG,_COMMIT_SHA=$TAG \
+            --async \
             --quiet
 
       - name: Deploy to Cloud Run
