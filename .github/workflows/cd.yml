@@ -41,7 +41,7 @@ jobs:
           gcloud builds submit \
             --config cloudbuild.yaml \
             --substitutions=_IMAGE=$IMAGE,_VERSION=$TAG,_COMMIT_SHA=$TAG \
-            --no-log-streaming
+            --quiet
 
       - name: Deploy to Cloud Run
         run: |
