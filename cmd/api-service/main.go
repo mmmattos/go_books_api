@@ -1,60 +1,48 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
 
+	_ "github.com/lib/pq"
+
 	"github.com/mmmattos/books_api/internal/app"
+	"github.com/mmmattos/books_api/internal/domain"
 	"github.com/mmmattos/books_api/internal/handlers"
 	"github.com/mmmattos/books_api/internal/repository/memory_book"
-)
-
-// These are set at build time via -ldflags.
-// Defaults are safe for local dev.
-var (
-	Version   = "dev"
-	CommitSHA = "unknown"
+	"github.com/mmmattos/books_api/internal/repository/postgres_book"
 )
 
 func main() {
-	log.Println("BOOT MARKER: starting books-api")
+	var repo domain.BookRepository
 
-	repo := memory_book.NewMemoryBookRepo()
-	uc := app.NewUsecase(repo)
-	api := handlers.NewRouter(uc)
+	dbConn := os.Getenv("DB_CONN")
 
-	// Root mux (infra-level)
-	root := http.NewServeMux()
+	if dbConn == "" {
+		log.Println("BOOT: using in-memory repository")
+		repo = memory_book.NewMemoryBookRepo()
+	} else {
+		log.Println("BOOT: using postgres repository")
 
-	// Health endpoint (Cloud Run–safe)
-	root.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("REQUEST HIT: %s %s", r.Method, r.URL.Path)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
+		db, err := sql.Open("postgres", dbConn)
+		if err != nil {
+			log.Fatalf("db open failed: %v", err)
+		}
+		defer db.Close()
 
-	// Debug/version endpoint
-	root.HandleFunc("/debug/version", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("REQUEST HIT: %s %s", r.Method, r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(
-			`{"service":"books-api","version":"` + Version + `","commit":"` + CommitSHA + `"}`,
-		))
-	})
-
-	// API routes
-	root.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("REQUEST HIT: %s %s", r.Method, r.URL.Path)
-		api.ServeHTTP(w, r)
-	}))
-
-	addr := ":8080"
-	if p := os.Getenv("PORT"); p != "" {
-		addr = ":" + p
+		repo = postgres_book.NewPostgresBookRepo(db)
 	}
 
-	log.Printf("BOOT MARKER: listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, root))
+	uc := app.NewUsecase(repo)
+	router := handlers.NewRouter(uc)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("BOOT: listening on :%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }

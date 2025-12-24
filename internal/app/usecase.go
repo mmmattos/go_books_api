@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mmmattos/books_api/internal/domain"
 )
@@ -22,6 +23,12 @@ func (u *Usecase) CreateBook(b *domain.Book) error {
 	if b.Title == "" || b.Author == "" {
 		return fmt.Errorf("title and author are required")
 	}
+
+	// FIX: assign ID without external dependency
+	if b.ID == "" {
+		b.ID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+
 	return u.Repo.Create(b)
 }
 
@@ -30,22 +37,16 @@ func (u *Usecase) GetAllBooks() ([]*domain.Book, error) {
 }
 
 func (u *Usecase) GetBookByID(id string) (*domain.Book, error) {
-	if id == "" {
-		return nil, fmt.Errorf("id required")
-	}
 	return u.Repo.GetByID(id)
 }
 
 func (u *Usecase) UpdateBook(b *domain.Book) error {
-	if b == nil || b.ID == "" {
-		return fmt.Errorf("invalid book")
+	if b == nil {
+		return fmt.Errorf("book is nil")
 	}
 	return u.Repo.Update(b)
 }
 
 func (u *Usecase) DeleteBook(id string) error {
-	if id == "" {
-		return fmt.Errorf("id required")
-	}
 	return u.Repo.Delete(id)
 }
